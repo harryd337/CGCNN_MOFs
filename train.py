@@ -2,7 +2,7 @@ from mof import MOF_CGCNN
 import csv
 
 ##read data
-with open('./traning_val.csv') as f:
+with open('./training_val.csv') as f:
     readerv = csv.reader(f)
     trainandval = [row for row in readerv]
 with open('./test.csv') as f:
