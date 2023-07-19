@@ -72,7 +72,7 @@ def split_dataset(molecule, target_pressure, train_val_test_split):
 molecule = 'co2'
 target_pressure = 0.1
 train_val_test_split = [0.7, 0.2, 0.1]
-epochs = 100
+epochs = 5
 # -----------------------
     
 split_dataset(molecule, target_pressure, train_val_test_split)

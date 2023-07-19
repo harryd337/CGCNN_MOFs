@@ -8,6 +8,7 @@ from random import sample
 from typing import Dict, List, Callable
 
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -133,6 +134,8 @@ class MOF_CGCNN(object):
         self.test_loader = DataLoader(self.testset, batch_size=self.batch_size,
         num_workers=self.works,shuffle=False,
         collate_fn=collate_pool, pin_memory=self.cuda)
+        self.train_maes = []
+        self.val_maes = []
 
     def train_MOF(self):
         if self.task == 'classification':
@@ -222,12 +225,34 @@ class MOF_CGCNN(object):
             'h_fea_len':self.h_fea_len,
             'n_p': self.n_p,
             'task':self.task}, is_best)
+        # Plot training curve
+        plt.figure()
+        plt.plot(self.train_maes, label='Training MAE')
+        plt.plot(self.val_maes, label='Validation MAE')
+        plt.xlabel('Epoch')
+        plt.ylabel('MAE')
+        plt.legend()
+        plt.show()
     # test best model
         print('---------Evaluate Model on Test Set---------------')
         best_checkpoint = torch.load('model_best.pth.tar')
         model.load_state_dict(best_checkpoint['state_dict'])
-        mae = self.validate(self.test_loader, model, criterion, normalizer, test=True)
-        return mae
+        test_mae = self.validate(self.test_loader, model, criterion, normalizer, test=True)
+        
+        # Plot losses bar chart
+        final_training_mae = self.train_maes[-1]
+        final_validation_mae = self.val_maes[-1]
+        labels = ['Training MAE', 'Validation MAE', 'Test MAE']
+        values = [final_training_mae, final_validation_mae, test_mae]
+        fig, ax = plt.subplots()
+        barlist = ax.bar(labels, values)
+        barlist[0].set_color('r')
+        barlist[1].set_color('g')
+        barlist[2].set_color('b')
+        ax.set_ylabel('MAE')
+        ax.set_title('Final training, validation and test MAEs')
+        plt.show()
+        return test_mae
 
     def pred_MOF(self,
         root_file : str = None,
@@ -364,6 +389,7 @@ class MOF_CGCNN(object):
                     prec=precisions, recall=recalls, f1=fscores,
                     auc=auc_scores)
                 )
+        self.train_maes.append(mae_errors.avg.cpu().numpy())
         print(' * MAE '+str(mae_errors.avg))
         
     def validate(self,val_loader, model, criterion, normalizer, test=False):
@@ -413,6 +439,7 @@ class MOF_CGCNN(object):
             else:
                 with torch.no_grad():
                     target_var = Variable(target_normed)
+        
         # compute output
             output = model(*input_var)
             mse_loss = [criterion(output[:,i], target_var[:,i]) for i in range(self.n_p)]
@@ -498,7 +525,9 @@ class MOF_CGCNN(object):
                     f.write(str(cif_id)+',')
                     for i in range(len(T_P)):
                         f.write(T_P[i]+',')
-                    f.write('\n')
+                    f.write('\n')   
+            self.val_maes.append(mae_errors.avg.cpu().numpy())
+                    
         if self.task == 'regression':
             print(' {star} MAE {mae_errors.avg:.3f}'.format(star=star_label,
                                                         mae_errors=mae_errors))
