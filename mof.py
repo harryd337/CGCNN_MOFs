@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.optim as optim
 from sklearn import metrics
 from torch.autograd import Variable
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import MultiStepLR, ExponentialLR
 from torch.utils.data import DataLoader
 
 from mofcgcnn.data import CIFData
@@ -94,6 +94,7 @@ class MOF_CGCNN(object):
             lr : float = 0.008,
             optim : str = 'Adam',
             lr_milestones : list = [100],
+            lr_decay_rate : float = 0.95,
             momentum : float = 0.9,
             weight_decay : float = 0.0,
             print_freq : int = 10,
@@ -115,6 +116,7 @@ class MOF_CGCNN(object):
         self.lr = lr
         self.optim = optim
         self.lr_milestones = lr_milestones
+        self.lr_decay_rate = lr_decay_rate
         self.momentum = momentum
         self.weight_decay = weight_decay
         self.print_freq = print_freq
@@ -194,8 +196,9 @@ class MOF_CGCNN(object):
                   .format(self.resume, checkpoint['epoch']))
             else:
                 print("=> no checkpoint found at '{}'".format(self.resume))
-        scheduler = MultiStepLR(optimizer, milestones=self.lr_milestones,
-                            gamma=0.1)
+        # scheduler = MultiStepLR(optimizer, milestones=self.lr_milestones,
+        #                     gamma=0.1)
+        scheduler = ExponentialLR(optimizer, gamma=self.lr_decay_rate)
         for epoch in range(self.epoch):
         # train for one epoch
             self.train_model(self.train_loader, model, criterion, optimizer, epoch, normalizer)
