@@ -16,6 +16,7 @@ from sklearn import metrics
 from torch.autograd import Variable
 from torch.optim.lr_scheduler import MultiStepLR, ExponentialLR
 from torch.utils.data import DataLoader
+from torchinfo import summary
 
 from mofcgcnn.data import CIFData
 from mofcgcnn.data import collate_pool
@@ -106,7 +107,8 @@ class MOF_CGCNN(object):
             root_file : str = None,
             trainset : List = None,
             valset : List = None,
-            testset : List = None):
+            testset : List = None,
+            num_of_RDF_PCs : int = 0):
         self.cuda = cuda
         self.task = task
         self.works = works
@@ -125,9 +127,9 @@ class MOF_CGCNN(object):
         self.n_conv = n_conv
         self.h_fea_len = h_fea_len
         self.resume = resume
-        self.trainset = CIFData(root_file,trainset)
-        self.valset = CIFData(root_file,valset)
-        self.testset = CIFData(root_file,testset)
+        self.trainset = CIFData(root_file,trainset, num_of_RDF_PCs)
+        self.valset = CIFData(root_file,valset, num_of_RDF_PCs)
+        self.testset = CIFData(root_file,testset, num_of_RDF_PCs)
         self.train_loader = DataLoader(self.trainset, batch_size=self.batch_size,
         num_workers=self.works,shuffle=True,collate_fn=collate_pool, pin_memory=self.cuda)
         self.val_loader = DataLoader(self.valset, batch_size=self.batch_size,
@@ -138,6 +140,7 @@ class MOF_CGCNN(object):
         collate_fn=collate_pool, pin_memory=self.cuda)
         self.train_maes = []
         self.val_maes = []
+        self.num_of_RDF_PCs = num_of_RDF_PCs
 
     def train_MOF(self):
         if self.task == 'classification':
@@ -167,7 +170,13 @@ class MOF_CGCNN(object):
                                 h_fea_len=self.h_fea_len,
                                 n_p= self.n_p,
                                 classification=True if self.task ==
-                                'classification' else False,dropout=self.dropout)
+                                'classification' else False,
+                                dropout=self.dropout,
+                                num_of_RDF_PCs=self.num_of_RDF_PCs)
+        # Model summary
+        one_batch_sample_data_list = [self.trainset[i] for i in sample(range(len(self.trainset)), self.batch_size)]
+        sample_features, _, _ = collate_pool(one_batch_sample_data_list)
+        print(summary(model, input_data=sample_features))
         if self.cuda == True:
             model.cuda()
         if self.task == 'classification':
@@ -281,7 +290,8 @@ class MOF_CGCNN(object):
                                 h_fea_len=model_checkpoint['h_fea_len'],
                                 n_p = model_checkpoint['n_p'],
                                 classification=True if model_checkpoint['task'] ==
-                                'classification' else False)
+                                'classification' else False,
+                                num_of_RDF_PCs=self.num_of_RDF_PCs)
         if self.cuda:
             model.cuda()
     # define loss func and optimizer
@@ -313,7 +323,7 @@ class MOF_CGCNN(object):
         elif number ==6:
             loss = (lossall[0] + lossall[1] + lossall[2] + lossall[3] + lossall[4] + lossall[5])/6
         return loss
-    def train_model(self,train_loader, model, criterion, optimizer, epoch, normalizer):
+    def train_model(self, train_loader, model, criterion, optimizer, epoch, normalizer):
         losses = AverageMeter()
         if self.task == 'regression':
             mae_errors = AverageMeter()
@@ -351,7 +361,6 @@ class MOF_CGCNN(object):
                 target_var = Variable(target_normed)
 
         # compute output
-
             output = model(*input_var)
             mse_loss = [criterion(output[:,i], target_var[:,i]) for i in range(self.n_p)]
             loss = self.cal_loss(mse_loss,self.n_p)
@@ -585,7 +594,9 @@ class MOF_CGCNN(object):
                                 h_fea_len=model_checkpoint['h_fea_len'],
                                 n_p = model_checkpoint['n_p'],
                                 classification=True if model_checkpoint['task'] ==
-                                'classification' else False,dropout=self.dropout)
+                                'classification' else False,
+                                dropout=self.dropout,
+                                num_of_RDF_PCs=self.num_of_RDF_PCs)
 
         ###load Parameters of graph
         if os.path.isfile(modelpath):

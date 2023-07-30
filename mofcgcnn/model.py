@@ -19,7 +19,7 @@ class ConvLayer(nn.Module):
 
     def forward(self, atom_in_fea, nbr_fea, nbr_fea_idx):
         N, M = nbr_fea_idx.shape
-        M1=int(M/2)
+        M1 = int(M/2)
         atom_nbr_fea = atom_in_fea[nbr_fea_idx, :]
         atom_in_fea_u = atom_in_fea.unsqueeze(1).expand(N, M1, self.atom_fea_len)
         atom_nbr_fea_1, atom_nbr_fea_2 = atom_nbr_fea.chunk(2,dim=1)
@@ -41,7 +41,7 @@ class ConvLayer(nn.Module):
 class CrystalGraphConvNet(nn.Module):
     def __init__(self, orig_atom_fea_len, nbr_fea_len,
                  atom_fea_len=64, n_conv=3, h_fea_len=128,n_p=1,
-                 classification=False,dropout=0):
+                 classification=False,dropout=0,num_of_RDF_PCs=0):
         super(CrystalGraphConvNet, self).__init__()
         self.classification = classification
         self.n_p = n_p
@@ -49,7 +49,7 @@ class CrystalGraphConvNet(nn.Module):
         self.convs = nn.ModuleList([ConvLayer(atom_fea_len=atom_fea_len,
                                     nbr_fea_len=nbr_fea_len)
                                     for _ in range(n_conv)])
-        self.conv_to_fc = nn.ModuleList([nn.Linear(atom_fea_len+4, h_fea_len)\
+        self.conv_to_fc = nn.ModuleList([nn.Linear(atom_fea_len + 4 + num_of_RDF_PCs, h_fea_len)\
                 for _ in range(self.n_p)])
         self.conv_to_fc_activation = nn.ModuleList([nn.Softplus() for _ in range(self.n_p)])
         self.fc_softplus = nn.Softplus()
@@ -61,7 +61,7 @@ class CrystalGraphConvNet(nn.Module):
             self.logsoftmax = nn.LogSoftmax(dim=1)
         self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, atom_fea, nbr_fea, nbr_fea_idx, M1_index, crystal_atom_idx,m2_fea):
+    def forward(self, atom_fea, nbr_fea, nbr_fea_idx, M1_index, crystal_atom_idx, m2_fea):
         atom_fea = self.embedding(atom_fea)
         atom_fea = self.fc_softplus(atom_fea)
         for conv_func in self.convs:

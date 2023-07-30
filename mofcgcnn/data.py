@@ -59,7 +59,7 @@ class GaussianDistance(object):
                       self.var**2)
 
 class CIFData(Dataset):
-    def __init__(self, root_dir,dataset, max_num_nbr=10,metal_max_num_nbr=16, metal_radius=8, radius=6, dmin=0, step=0.2,
+    def __init__(self, root_dir, dataset, num_of_RDF_PCs=0, max_num_nbr=10, metal_max_num_nbr=16, metal_radius=8, radius=6, dmin=0, step=0.2,
                  random_seed=24,pred=False):
         self.root_dir = root_dir
         self.max_num_nbr, self.radius = max_num_nbr, radius
@@ -68,18 +68,21 @@ class CIFData(Dataset):
         self.id_prop_data = dataset
         self.pred = pred
         self.gdf = GaussianDistance(dmin=dmin, dmax=self.radius, step=step)
+        self.num_of_RDF_PCs = num_of_RDF_PCs
 
     def __len__(self):
         return len(self.id_prop_data)
 
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx):
+        cif_id = str(self.id_prop_data[idx][0])
         if self.pred == False:
-            cif_id = str(self.id_prop_data[idx][0])
-            target = [float(x) for x in self.id_prop_data[idx][5:6]]
+            target = [float(x) for x in self.id_prop_data[idx][(5 + self.num_of_RDF_PCs):(6 + self.num_of_RDF_PCs)]]
         else:
-            cif_id,target = str(self.id_prop_data[idx][0]),[float(self.id_prop_data[idx][-1])]
-        m2_feature = [float(self.id_prop_data[idx][1]),float(self.id_prop_data[idx][2]),float(self.id_prop_data[idx][3]),float(self.id_prop_data[idx][4])]
+            target = [float(self.id_prop_data[idx][-1])]
+        m2_feature = []
+        for i in range(4 + self.num_of_RDF_PCs):
+            m2_feature.append(float(self.id_prop_data[idx][i + 1]))
         crystal = Structure.from_file(os.path.join(self.root_dir,
                                                    cif_id+'.cif'))
         metal_index = []
@@ -149,4 +152,4 @@ class CIFData(Dataset):
         M1_index = torch.LongTensor(M1_idx)
         target = torch.Tensor(target)
         M2_feature = torch.Tensor(m2_feature)
-        return (atom_fea, nbr_fea, nbr_fea_idx,M1_index,M2_feature), target, cif_id
+        return (atom_fea, nbr_fea, nbr_fea_idx, M1_index, M2_feature), target, cif_id
